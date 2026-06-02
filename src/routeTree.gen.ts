@@ -9,8 +9,38 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ProjectsRouteImport } from './routes/projects'
+import { Route as ImpactRouteImport } from './routes/impact'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as CommunitiesRouteImport } from './routes/communities'
+import { Route as AtlasAiRouteImport } from './routes/atlas-ai'
 import { Route as IndexRouteImport } from './routes/index'
 
+const ProjectsRoute = ProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ImpactRoute = ImpactRouteImport.update({
+  id: '/impact',
+  path: '/impact',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CommunitiesRoute = CommunitiesRouteImport.update({
+  id: '/communities',
+  path: '/communities',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AtlasAiRoute = AtlasAiRouteImport.update({
+  id: '/atlas-ai',
+  path: '/atlas-ai',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -19,28 +49,102 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/atlas-ai': typeof AtlasAiRoute
+  '/communities': typeof CommunitiesRoute
+  '/dashboard': typeof DashboardRoute
+  '/impact': typeof ImpactRoute
+  '/projects': typeof ProjectsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/atlas-ai': typeof AtlasAiRoute
+  '/communities': typeof CommunitiesRoute
+  '/dashboard': typeof DashboardRoute
+  '/impact': typeof ImpactRoute
+  '/projects': typeof ProjectsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/atlas-ai': typeof AtlasAiRoute
+  '/communities': typeof CommunitiesRoute
+  '/dashboard': typeof DashboardRoute
+  '/impact': typeof ImpactRoute
+  '/projects': typeof ProjectsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/atlas-ai'
+    | '/communities'
+    | '/dashboard'
+    | '/impact'
+    | '/projects'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/atlas-ai'
+    | '/communities'
+    | '/dashboard'
+    | '/impact'
+    | '/projects'
+  id:
+    | '__root__'
+    | '/'
+    | '/atlas-ai'
+    | '/communities'
+    | '/dashboard'
+    | '/impact'
+    | '/projects'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AtlasAiRoute: typeof AtlasAiRoute
+  CommunitiesRoute: typeof CommunitiesRoute
+  DashboardRoute: typeof DashboardRoute
+  ImpactRoute: typeof ImpactRoute
+  ProjectsRoute: typeof ProjectsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/projects': {
+      id: '/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof ProjectsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/impact': {
+      id: '/impact'
+      path: '/impact'
+      fullPath: '/impact'
+      preLoaderRoute: typeof ImpactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/communities': {
+      id: '/communities'
+      path: '/communities'
+      fullPath: '/communities'
+      preLoaderRoute: typeof CommunitiesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/atlas-ai': {
+      id: '/atlas-ai'
+      path: '/atlas-ai'
+      fullPath: '/atlas-ai'
+      preLoaderRoute: typeof AtlasAiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -53,17 +157,12 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AtlasAiRoute: AtlasAiRoute,
+  CommunitiesRoute: CommunitiesRoute,
+  DashboardRoute: DashboardRoute,
+  ImpactRoute: ImpactRoute,
+  ProjectsRoute: ProjectsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
