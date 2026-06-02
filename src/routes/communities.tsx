@@ -1,6 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Users, MapPin } from "lucide-react";
 import { PageShell, PageHeader } from "@/components/PageShell";
+import { useAtlas } from "@/lib/atlas-store";
 
 export const Route = createFileRoute("/communities")({
   head: () => ({
@@ -14,16 +15,8 @@ export const Route = createFileRoute("/communities")({
   component: Communities,
 });
 
-const communities = [
-  { name: "Lodwar Basin", region: "Turkana, Kenya", population: 12400, projects: 4, score: 92, needs: "Water · Healthcare" },
-  { name: "Amani Highlands", region: "Chiapas, Mexico", population: 3200, projects: 2, score: 88, needs: "Trade · Education" },
-  { name: "Omo Valley", region: "South Ethiopia", population: 8700, projects: 5, score: 81, needs: "Education · Food" },
-  { name: "Sundarbans Delta", region: "West Bengal, India", population: 21500, projects: 6, score: 76, needs: "Climate · Health" },
-  { name: "Tindouf Camp", region: "Western Sahara", population: 14200, projects: 3, score: 84, needs: "Food · Shelter" },
-  { name: "Cabo Delgado", region: "Northern Mozambique", population: 9100, projects: 2, score: 71, needs: "Shelter · Health" },
-];
-
 function Communities() {
+  const communities = useAtlas((s) => s.communities);
   return (
     <PageShell>
       <PageHeader
@@ -32,10 +25,10 @@ function Communities() {
         description="Each profile captures population, active projects, needs assessment and a verified impact score."
       />
       <section className="px-6 py-12">
-        <div className="mx-auto max-w-7xl grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="mx-auto grid max-w-7xl gap-6 md:grid-cols-2 lg:grid-cols-3">
           {communities.map((c) => (
             <article
-              key={c.name}
+              key={c.id}
               className="group rounded-2xl bg-card p-6 ring-1 ring-ink/5 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-ink/5"
             >
               <div className="flex items-start justify-between">
@@ -47,12 +40,8 @@ function Communities() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-mono text-[10px] uppercase tracking-wider text-ink/45">
-                    Impact
-                  </p>
-                  <p className="font-serif text-2xl text-moss tabular-nums">
-                    {c.score}
-                  </p>
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-ink/45">Impact</p>
+                  <p className="font-serif text-2xl text-moss tabular-nums">{c.score}</p>
                 </div>
               </div>
 
@@ -60,32 +49,30 @@ function Communities() {
 
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="font-mono text-[10px] uppercase tracking-wider text-ink/45">
-                    Population
-                  </p>
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-ink/45">Population</p>
                   <p className="mt-1 flex items-center gap-1.5 font-medium tabular-nums">
                     <Users className="size-3.5 text-ink/40" />
                     {c.population.toLocaleString()}
                   </p>
                 </div>
                 <div>
-                  <p className="font-mono text-[10px] uppercase tracking-wider text-ink/45">
-                    Active Projects
-                  </p>
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-ink/45">Active Projects</p>
                   <p className="mt-1 font-medium tabular-nums">{c.projects}</p>
                 </div>
               </div>
 
               <div className="mt-5">
-                <p className="font-mono text-[10px] uppercase tracking-wider text-ink/45">
-                  Priority Needs
-                </p>
+                <p className="font-mono text-[10px] uppercase tracking-wider text-ink/45">Priority Needs</p>
                 <p className="mt-1 text-sm text-ink/70">{c.needs}</p>
               </div>
 
-              <button className="mt-6 w-full rounded-full border border-ink/10 py-2.5 text-sm font-medium transition-colors hover:bg-ink hover:text-sand">
+              <Link
+                to="/communities/$id"
+                params={{ id: c.slug }}
+                className="mt-6 block w-full rounded-full border border-ink/10 py-2.5 text-center text-sm font-medium transition-colors hover:bg-ink hover:text-sand"
+              >
                 Open Profile
-              </button>
+              </Link>
             </article>
           ))}
         </div>
