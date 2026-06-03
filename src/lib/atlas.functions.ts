@@ -19,7 +19,7 @@ export const listProjects = createServerFn({ method: "GET" }).handler(async () =
     .select("*")
     .order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
-  return (data ?? []) as ProjectRow[];
+  return (data ?? []) as unknown as ProjectRow[];
 });
 
 export const listCommunities = createServerFn({ method: "GET" }).handler(async () => {
@@ -29,7 +29,7 @@ export const listCommunities = createServerFn({ method: "GET" }).handler(async (
     .select("*")
     .order("score", { ascending: false });
   if (error) throw new Error(error.message);
-  return (data ?? []) as CommunityRow[];
+  return (data ?? []) as unknown as CommunityRow[];
 });
 
 export const listEvidence = createServerFn({ method: "GET" }).handler(async () => {
@@ -40,7 +40,7 @@ export const listEvidence = createServerFn({ method: "GET" }).handler(async () =
     .order("created_at", { ascending: false })
     .limit(200);
   if (error) throw new Error(error.message);
-  return (data ?? []) as EvidenceRow[];
+  return (data ?? []) as unknown as EvidenceRow[];
 });
 
 export const listTransactions = createServerFn({ method: "GET" }).handler(async () => {
@@ -51,7 +51,7 @@ export const listTransactions = createServerFn({ method: "GET" }).handler(async 
     .order("created_at", { ascending: false })
     .limit(200);
   if (error) throw new Error(error.message);
-  return (data ?? []) as TransactionRow[];
+  return (data ?? []) as unknown as TransactionRow[];
 });
 
 export const listTrustBreakdown = createServerFn({ method: "GET" }).handler(async () => {
@@ -60,7 +60,7 @@ export const listTrustBreakdown = createServerFn({ method: "GET" }).handler(asyn
     .from("project_trust_breakdown")
     .select("*");
   if (error) throw new Error(error.message);
-  return (data ?? []) as TrustBreakdownRow[];
+  return (data ?? []) as unknown as TrustBreakdownRow[];
 });
 
 export const getEvidence = createServerFn({ method: "GET" })
@@ -73,7 +73,7 @@ export const getEvidence = createServerFn({ method: "GET" })
       .eq("id", data.id)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    return row as EvidenceRow | null;
+    return (row ?? null) as unknown as EvidenceRow | null;
   });
 
 export const getReceipt = createServerFn({ method: "GET" })
@@ -88,7 +88,7 @@ export const getReceipt = createServerFn({ method: "GET" })
       .eq("receipt_number", data.receipt)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    return tx as TransactionRow | null;
+    return (tx ?? null) as unknown as TransactionRow | null;
   });
 
 // -------- Authenticated writes --------
@@ -111,17 +111,29 @@ export const createEvidence = createServerFn({ method: "POST" })
   .inputValidator((d) => EvidenceInsert.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { data: row, error } = await supabase
-      .from("evidence")
-      .insert({
-        ...data,
-        uploader_id: userId,
-        captured_at: data.captured_at ?? new Date().toISOString(),
-      })
+    const insertRow = {
+      project_id: data.project_id,
+      kind: data.kind,
+      title: data.title,
+      meta: data.meta ?? null,
+      lat: data.lat ?? null,
+      lng: data.lng ?? null,
+      media_url: data.media_url ?? null,
+      iot_payload: (data.iot_payload ?? null) as never,
+      report_text: data.report_text ?? null,
+      uploader_id: userId,
+      captured_at: data.captured_at ?? new Date().toISOString(),
+    };
+    const { data: row, error } = await (supabase.from("evidence") as never as {
+      insert: (r: typeof insertRow) => {
+        select: (s: string) => { single: () => Promise<{ data: unknown; error: { message: string } | null }> };
+      };
+    })
+      .insert(insertRow)
       .select("*")
       .single();
     if (error) throw new Error(error.message);
-    return row as EvidenceRow;
+    return row as unknown as EvidenceRow;
   });
 
 const FundInput = z.object({
@@ -135,13 +147,18 @@ export const fundProject = createServerFn({ method: "POST" })
   .inputValidator((d) => FundInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
-    const { data: tx, error } = await supabase.rpc("fund_project", {
+    const { data: tx, error } = await (
+      supabase.rpc as unknown as (
+        fn: string,
+        args: Record<string, unknown>,
+      ) => Promise<{ data: unknown; error: { message: string } | null }>
+    )("fund_project", {
       _project_id: data.project_id,
       _amount_cents: data.amount_cents,
       _donor_name: data.donor_name ?? null,
     });
     if (error) throw new Error(error.message);
-    return tx as TransactionRow;
+    return tx as unknown as TransactionRow;
   });
 
 export type { EvidenceKind };

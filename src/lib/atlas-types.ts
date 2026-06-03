@@ -43,7 +43,7 @@ export type EvidenceRow = {
   lat: number | null;
   lng: number | null;
   media_url: string | null;
-  iot_payload: Record<string, unknown> | null;
+  iot_payload: unknown;
   report_text: string | null;
   captured_at: string;
   created_at: string;
