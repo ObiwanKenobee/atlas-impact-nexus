@@ -14,16 +14,295 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      communities: {
+        Row: {
+          created_at: string
+          economy: Json
+          environment: Json
+          id: string
+          name: string
+          needs: string | null
+          overview: string | null
+          population: number
+          region: string
+          reports: Json
+          score: number
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          economy?: Json
+          environment?: Json
+          id: string
+          name: string
+          needs?: string | null
+          overview?: string | null
+          population?: number
+          region: string
+          reports?: Json
+          score?: number
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          economy?: Json
+          environment?: Json
+          id?: string
+          name?: string
+          needs?: string | null
+          overview?: string | null
+          population?: number
+          region?: string
+          reports?: Json
+          score?: number
+          slug?: string
+        }
+        Relationships: []
+      }
+      evidence: {
+        Row: {
+          captured_at: string
+          created_at: string
+          id: string
+          iot_payload: Json | null
+          kind: Database["public"]["Enums"]["evidence_kind"]
+          lat: number | null
+          lng: number | null
+          media_url: string | null
+          meta: string | null
+          project_id: string
+          report_text: string | null
+          title: string
+          uploader_id: string | null
+        }
+        Insert: {
+          captured_at?: string
+          created_at?: string
+          id?: string
+          iot_payload?: Json | null
+          kind: Database["public"]["Enums"]["evidence_kind"]
+          lat?: number | null
+          lng?: number | null
+          media_url?: string | null
+          meta?: string | null
+          project_id: string
+          report_text?: string | null
+          title: string
+          uploader_id?: string | null
+        }
+        Update: {
+          captured_at?: string
+          created_at?: string
+          id?: string
+          iot_payload?: Json | null
+          kind?: Database["public"]["Enums"]["evidence_kind"]
+          lat?: number | null
+          lng?: number | null
+          media_url?: string | null
+          meta?: string | null
+          project_id?: string
+          report_text?: string | null
+          title?: string
+          uploader_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evidence_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_trust_breakdown"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "evidence_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          id: string
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: []
+      }
+      projects: {
+        Row: {
+          beneficiaries: number
+          category: string
+          community_id: string
+          created_at: string
+          description: string
+          donors: number
+          goal_cents: number
+          id: string
+          image_key: string | null
+          location: string
+          long_description: string | null
+          raised_cents: number
+          slug: string
+          started_at: string | null
+          title: string
+          verified_score: number
+        }
+        Insert: {
+          beneficiaries?: number
+          category: string
+          community_id: string
+          created_at?: string
+          description: string
+          donors?: number
+          goal_cents?: number
+          id: string
+          image_key?: string | null
+          location: string
+          long_description?: string | null
+          raised_cents?: number
+          slug: string
+          started_at?: string | null
+          title: string
+          verified_score?: number
+        }
+        Update: {
+          beneficiaries?: number
+          category?: string
+          community_id?: string
+          created_at?: string
+          description?: string
+          donors?: number
+          goal_cents?: number
+          id?: string
+          image_key?: string | null
+          location?: string
+          long_description?: string | null
+          raised_cents?: number
+          slug?: string
+          started_at?: string | null
+          title?: string
+          verified_score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transactions: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          donor_id: string | null
+          donor_name: string | null
+          id: string
+          project_id: string
+          receipt_number: string
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          donor_id?: string | null
+          donor_name?: string | null
+          id?: string
+          project_id: string
+          receipt_number?: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          donor_id?: string | null
+          donor_name?: string | null
+          id?: string
+          project_id?: string
+          receipt_number?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_trust_breakdown"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "transactions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
-      [_ in never]: never
+      project_trust_breakdown: {
+        Row: {
+          beneficiary_count: number | null
+          beneficiary_points: number | null
+          gps_count: number | null
+          gps_points: number | null
+          media_count: number | null
+          media_points: number | null
+          project_id: string | null
+          report_count: number | null
+          report_points: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      [_ in never]: never
+      fund_project: {
+        Args: {
+          _amount_cents: number
+          _donor_name?: string
+          _project_id: string
+        }
+        Returns: {
+          amount_cents: number
+          created_at: string
+          donor_id: string | null
+          donor_name: string | null
+          id: string
+          project_id: string
+          receipt_number: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "transactions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "donor" | "field_worker" | "community_leader" | "admin"
+      evidence_kind:
+        | "GPS"
+        | "IoT"
+        | "PHOTO"
+        | "VIDEO"
+        | "REPORT"
+        | "BENEFICIARY"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +429,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["donor", "field_worker", "community_leader", "admin"],
+      evidence_kind: ["GPS", "IoT", "PHOTO", "VIDEO", "REPORT", "BENEFICIARY"],
+    },
   },
 } as const
