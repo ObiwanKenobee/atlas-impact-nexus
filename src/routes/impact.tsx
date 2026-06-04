@@ -1,8 +1,17 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { Camera, CheckCircle2, FileText, MapPin, Radio, Video, Users } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { Camera, Download, FileText, MapPin, Radio, Upload, Users, Video } from "lucide-react";
 import { useState } from "react";
 import { PageShell, PageHeader } from "@/components/PageShell";
-import { useAtlas, type EvidenceKind } from "@/lib/atlas-store";
+import { TrustBreakdown } from "@/components/TrustBreakdown";
+import {
+  evidenceQuery,
+  projectsQuery,
+  transactionsQuery,
+  trustQuery,
+} from "@/lib/atlas-queries";
+import type { EvidenceKind } from "@/lib/atlas-types";
+import { exportEvidenceCsv, exportTransactionsCsv, relativeTime } from "@/lib/exports";
 
 export const Route = createFileRoute("/impact")({
   head: () => ({
@@ -10,7 +19,7 @@ export const Route = createFileRoute("/impact")({
       { title: "Impact Verification — Atlas Sanctum" },
       { name: "description", content: "GPS, IoT, photo, video and field-report evidence powering every verification score." },
       { property: "og:title", content: "Atlas Sanctum · Impact Verification" },
-      { property: "og:description", content: "GPS, IoT, photo, video and field-report evidence powering every verification score." },
+      { property: "og:description", content: "Live ledger of field evidence with weighted trust scoring." },
     ],
   }),
   component: Impact,
@@ -36,20 +45,29 @@ const filters: { id: "ALL" | EvidenceKind; label: string }[] = [
 ];
 
 function Impact() {
-  const evidence = useAtlas((s) => s.evidence);
-  const projects = useAtlas((s) => s.projects);
+  const { data: evidence = [] } = useQuery(evidenceQuery);
+  const { data: projects = [] } = useQuery(projectsQuery);
+  const { data: txs = [] } = useQuery(transactionsQuery);
+  const { data: trust = [] } = useQuery(trustQuery);
   const [filter, setFilter] = useState<"ALL" | EvidenceKind>("ALL");
 
   const visible = filter === "ALL" ? evidence : evidence.filter((e) => e.kind === filter);
 
-  const sources = [
-    { label: "GPS Confirmations", value: evidence.filter((e) => e.kind === "GPS").length * 137, weight: 28 },
-    { label: "Beneficiary Acknowledgements", value: evidence.filter((e) => e.kind === "BENEFICIARY").length * 350 + 2754, weight: 26 },
-    { label: "IoT Sensor Readings", value: evidence.filter((e) => e.kind === "IoT").length * 4730 + 9460, weight: 22 },
-    { label: "Independent Audits", value: evidence.filter((e) => e.kind === "REPORT").length * 11, weight: 24 },
-  ];
-
-  const score = Math.round(projects.reduce((s, p) => s + p.verified, 0) / projects.length);
+  // Aggregate breakdown across all projects for a network-wide panel
+  const aggregate = trust.reduce(
+    (acc, t) => ({
+      project_id: "network",
+      gps_count: acc.gps_count + t.gps_count,
+      media_count: acc.media_count + t.media_count,
+      beneficiary_count: acc.beneficiary_count + t.beneficiary_count,
+      report_count: acc.report_count + t.report_count,
+      gps_points: Math.min(28, acc.gps_points + t.gps_points / Math.max(1, trust.length)),
+      media_points: Math.min(22, acc.media_points + t.media_points / Math.max(1, trust.length)),
+      beneficiary_points: Math.min(26, acc.beneficiary_points + t.beneficiary_points / Math.max(1, trust.length)),
+      report_points: Math.min(24, acc.report_points + t.report_points / Math.max(1, trust.length)),
+    }),
+    { project_id: "network", gps_count: 0, media_count: 0, beneficiary_count: 0, report_count: 0, gps_points: 0, media_points: 0, beneficiary_points: 0, report_points: 0 },
+  );
 
   return (
     <PageShell>
@@ -60,18 +78,40 @@ function Impact() {
       />
       <section className="px-6 py-12">
         <div className="mx-auto max-w-7xl">
-          <div className="mb-6 flex flex-wrap gap-2">
-            {filters.map((f) => (
-              <button
-                key={f.id}
-                onClick={() => setFilter(f.id)}
-                className={`rounded-full px-3.5 py-1.5 text-xs font-medium ring-1 transition-colors ${
-                  filter === f.id ? "bg-ink text-sand ring-ink" : "bg-card text-ink/70 ring-ink/10 hover:bg-sand-deep"
-                }`}
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap gap-2">
+              {filters.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setFilter(f.id)}
+                  className={`rounded-full px-3.5 py-1.5 text-xs font-medium ring-1 transition-colors ${
+                    filter === f.id ? "bg-ink text-sand ring-ink" : "bg-card text-ink/70 ring-ink/10 hover:bg-sand-deep"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                to="/impact/upload"
+                className="inline-flex items-center gap-1.5 rounded-full bg-ink px-3.5 py-1.5 text-xs font-medium text-sand hover:bg-moss"
               >
-                {f.label}
+                <Upload className="size-3.5" /> Upload evidence
+              </Link>
+              <button
+                onClick={() => exportEvidenceCsv(evidence)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-ink/10 bg-card px-3.5 py-1.5 text-xs font-medium hover:bg-sand-deep"
+              >
+                <Download className="size-3.5" /> Ledger CSV
               </button>
-            ))}
+              <button
+                onClick={() => exportTransactionsCsv(txs)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-ink/10 bg-card px-3.5 py-1.5 text-xs font-medium hover:bg-sand-deep"
+              >
+                <Download className="size-3.5" /> Transactions CSV
+              </button>
+            </div>
           </div>
 
           <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
@@ -84,9 +124,12 @@ function Impact() {
                 </span>
               </div>
               <ul className="divide-y divide-ink/5">
+                {visible.length === 0 && (
+                  <li className="px-6 py-12 text-center text-sm text-ink/50">No evidence yet.</li>
+                )}
                 {visible.map((e) => {
                   const Icon = iconFor[e.kind];
-                  const project = projects.find((p) => p.id === e.projectId);
+                  const project = projects.find((p) => p.id === e.project_id);
                   const isAudit = e.kind === "REPORT";
                   return (
                     <li key={e.id} className="flex items-center gap-4 px-6 py-5">
@@ -102,14 +145,20 @@ function Impact() {
                           <span className={`font-mono text-[10px] font-semibold tracking-widest ${isAudit ? "text-earth" : "text-moss"}`}>
                             {e.kind}
                           </span>
-                          <span className="text-sm font-medium">{e.title}</span>
+                          <Link
+                            to="/impact/evidence/$id"
+                            params={{ id: e.id }}
+                            className="text-sm font-medium hover:text-moss"
+                          >
+                            {e.title}
+                          </Link>
                         </div>
                         <p className="mt-1 font-mono text-[11px] text-ink/45">
                           {e.meta}
-                          {project && <> · <span className="text-ink/60">{project.title}</span></>}
+                          {project && <> · <Link to="/projects/$id" params={{ id: project.slug }} className="text-ink/60 hover:text-moss">{project.title}</Link></>}
                         </p>
                       </div>
-                      <span className="font-mono text-[11px] text-ink/40">{e.time}</span>
+                      <span className="font-mono text-[11px] text-ink/40">{relativeTime(e.captured_at)}</span>
                     </li>
                   );
                 })}
@@ -117,32 +166,7 @@ function Impact() {
             </div>
 
             <aside className="space-y-6">
-              <div className="rounded-2xl bg-ink p-8 text-sand ring-1 ring-ink/5">
-                <p className="font-mono text-xs uppercase tracking-widest text-sand/50">Network Trust Score</p>
-                <div className="mt-4 flex items-end gap-3">
-                  <span className="font-serif text-7xl font-medium tabular-nums">{score}</span>
-                  <span className="mb-3 font-mono text-sm text-moss">%</span>
-                </div>
-                <div className="mt-4 flex items-center gap-2 text-sm text-sand/70">
-                  <CheckCircle2 className="size-4 text-moss" />
-                  Verified across all evidence channels
-                </div>
-                <div className="my-6 h-px bg-sand/10" />
-                <ul className="space-y-4">
-                  {sources.map((s) => (
-                    <li key={s.label}>
-                      <div className="mb-1.5 flex items-center justify-between">
-                        <span className="text-xs text-sand/70">{s.label}</span>
-                        <span className="font-mono text-[11px] text-sand/50">weight {s.weight}%</span>
-                      </div>
-                      <div className="h-1 w-full overflow-hidden rounded-full bg-sand/10">
-                        <div className="h-full rounded-full bg-moss" style={{ width: `${s.weight * 3.5}%` }} />
-                      </div>
-                      <p className="mt-1 font-mono text-[10px] text-sand/40">{s.value.toLocaleString()} datapoints</p>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <TrustBreakdown breakdown={aggregate} />
             </aside>
           </div>
         </div>

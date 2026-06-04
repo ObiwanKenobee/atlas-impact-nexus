@@ -1,5 +1,13 @@
 export type EvidenceKind = "GPS" | "IoT" | "PHOTO" | "VIDEO" | "REPORT" | "BENEFICIARY";
 
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: JsonValue }
+  | JsonValue[];
+
 export type ProjectRow = {
   id: string;
   slug: string;
@@ -43,7 +51,8 @@ export type EvidenceRow = {
   lat: number | null;
   lng: number | null;
   media_url: string | null;
-  iot_payload: unknown;
+  iot_payload: JsonValue | null;
+  media_signed_url?: string | null;
   report_text: string | null;
   captured_at: string;
   created_at: string;

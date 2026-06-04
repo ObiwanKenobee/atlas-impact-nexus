@@ -1,28 +1,68 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { X, Heart } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { Heart, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { atlasStore, type Project } from "@/lib/atlas-store";
+import { useAuth } from "@/hooks/use-auth";
+import { fundProject } from "@/lib/atlas.functions";
+import { qk } from "@/lib/atlas-queries";
+import type { ProjectRow } from "@/lib/atlas-types";
 
 export function SupportDialog({
   project,
   trigger,
 }: {
-  project: Project;
+  project: ProjectRow;
   trigger: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(100);
-
+  const [donorName, setDonorName] = useState("");
+  const [busy, setBusy] = useState(false);
   const presets = [50, 100, 250, 500, 1000];
+  const { user } = useAuth();
+  const fund = useServerFn(fundProject);
+  const qc = useQueryClient();
+  const navigate = useNavigate();
 
-  function submit() {
+  async function submit() {
     if (!amount || amount <= 0) return;
-    atlasStore.fundProject(project.id, amount);
-    toast.success(`Thank you. $${amount.toLocaleString()} routed to ${project.title}.`, {
-      description: "A ledger entry was added and impact metrics updated.",
-    });
-    setOpen(false);
+    if (!user) {
+      toast.error("Please sign in to fund a project.");
+      navigate({ to: "/auth" });
+      return;
+    }
+    setBusy(true);
+    try {
+      const tx = await fund({
+        data: {
+          project_id: project.id,
+          amount_cents: Math.round(amount * 100),
+          donor_name: donorName.trim() || null,
+        },
+      });
+      toast.success(`Routed $${amount.toLocaleString()} to ${project.title}`, {
+        description: `Receipt ${tx.receipt_number} · ledger updated.`,
+        action: {
+          label: "View receipt",
+          onClick: () => navigate({ to: "/receipts/$id", params: { id: tx.receipt_number } }),
+        },
+      });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: qk.projects }),
+        qc.invalidateQueries({ queryKey: qk.transactions }),
+        qc.invalidateQueries({ queryKey: qk.evidence }),
+        qc.invalidateQueries({ queryKey: qk.trust }),
+      ]);
+      setOpen(false);
+      navigate({ to: "/receipts/$id", params: { id: tx.receipt_number } });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Funding failed");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -50,6 +90,7 @@ export function SupportDialog({
               {presets.map((v) => (
                 <button
                   key={v}
+                  type="button"
                   onClick={() => setAmount(v)}
                   className={`rounded-full px-3.5 py-1.5 text-xs font-medium ring-1 transition-colors ${
                     amount === v
@@ -68,21 +109,41 @@ export function SupportDialog({
               <input
                 type="number"
                 min={1}
+                max={100000}
                 value={amount}
                 onChange={(e) => setAmount(Number(e.target.value))}
                 className="mt-1 w-full rounded-xl bg-sand-deep px-4 py-3 font-serif text-2xl tabular-nums ring-1 ring-ink/5 focus:outline-none focus:ring-moss"
               />
             </label>
+            <label className="block">
+              <span className="font-mono text-[10px] uppercase tracking-widest text-ink/50">
+                Donor name (optional, shows on receipt)
+              </span>
+              <input
+                type="text"
+                value={donorName}
+                onChange={(e) => setDonorName(e.target.value.slice(0, 120))}
+                placeholder="Anonymous donor"
+                className="mt-1 w-full rounded-xl bg-sand-deep px-4 py-2.5 text-sm ring-1 ring-ink/5 focus:outline-none focus:ring-moss"
+              />
+            </label>
           </div>
 
           <button
+            type="button"
             onClick={submit}
-            className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-ink py-3 text-sm font-medium text-sand transition-colors hover:bg-moss"
+            disabled={busy}
+            className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-ink py-3 text-sm font-medium text-sand transition-colors hover:bg-moss disabled:opacity-60"
           >
             <Heart className="size-4" />
-            Route ${amount.toLocaleString()} to project
+            {busy ? "Routing…" : `Route $${amount.toLocaleString()} to project`}
           </button>
-          <p className="mt-3 text-center font-mono text-[10px] text-ink/40">
+          {!user && (
+            <p className="mt-3 text-center font-mono text-[10px] text-earth">
+              Sign in required · you'll be redirected
+            </p>
+          )}
+          <p className="mt-2 text-center font-mono text-[10px] text-ink/40">
             Demo flow · no real payment is processed
           </p>
         </Dialog.Content>

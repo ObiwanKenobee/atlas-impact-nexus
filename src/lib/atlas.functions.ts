@@ -5,12 +5,13 @@ import type {
   CommunityRow,
   EvidenceKind,
   EvidenceRow,
+  JsonValue,
   ProjectRow,
   TransactionRow,
   TrustBreakdownRow,
 } from "./atlas-types";
 
-// -------- Public reads (use admin to be visible to anon visitors) --------
+// -------- Public reads --------
 
 export const listProjects = createServerFn({ method: "GET" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -40,7 +41,10 @@ export const listEvidence = createServerFn({ method: "GET" }).handler(async () =
     .order("created_at", { ascending: false })
     .limit(200);
   if (error) throw new Error(error.message);
-  return (data ?? []) as unknown as EvidenceRow[];
+  return (data ?? []).map((r) => ({
+    ...r,
+    iot_payload: (r.iot_payload ?? null) as JsonValue | null,
+  })) as unknown as EvidenceRow[];
 });
 
 export const listTransactions = createServerFn({ method: "GET" }).handler(async () => {
@@ -56,9 +60,7 @@ export const listTransactions = createServerFn({ method: "GET" }).handler(async 
 
 export const listTrustBreakdown = createServerFn({ method: "GET" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin
-    .from("project_trust_breakdown")
-    .select("*");
+  const { data, error } = await supabaseAdmin.from("project_trust_breakdown").select("*");
   if (error) throw new Error(error.message);
   return (data ?? []) as unknown as TrustBreakdownRow[];
 });
@@ -73,7 +75,19 @@ export const getEvidence = createServerFn({ method: "GET" })
       .eq("id", data.id)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    return (row ?? null) as unknown as EvidenceRow | null;
+    if (!row) return null;
+    let media_signed_url: string | null = null;
+    if (row.media_url) {
+      const { data: signed } = await supabaseAdmin.storage
+        .from("evidence-media")
+        .createSignedUrl(row.media_url, 60 * 60);
+      media_signed_url = signed?.signedUrl ?? null;
+    }
+    return {
+      ...row,
+      iot_payload: (row.iot_payload ?? null) as JsonValue | null,
+      media_signed_url,
+    } as unknown as EvidenceRow;
   });
 
 export const getReceipt = createServerFn({ method: "GET" })
@@ -126,14 +140,17 @@ export const createEvidence = createServerFn({ method: "POST" })
     };
     const { data: row, error } = await (supabase.from("evidence") as never as {
       insert: (r: typeof insertRow) => {
-        select: (s: string) => { single: () => Promise<{ data: unknown; error: { message: string } | null }> };
+        select: (s: string) => {
+          single: () => Promise<{ data: unknown; error: { message: string } | null }>;
+        };
       };
     })
       .insert(insertRow)
       .select("*")
       .single();
     if (error) throw new Error(error.message);
-    return row as unknown as EvidenceRow;
+    const r = row as { id: string };
+    return { id: r.id };
   });
 
 const FundInput = z.object({
