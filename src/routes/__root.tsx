@@ -8,9 +8,11 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
+import { Toaster } from "sonner";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { AuthProvider } from "@/hooks/use-auth";
 
 function NotFoundComponent() {
   return (
@@ -91,12 +93,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "Atlas Sanctum — Transforming Relief Into Prosperity" },
-      { name: "description", content: "Community Compass enables transparent tracking of humanitarian impact and community transformation." },
-      { property: "og:description", content: "Community Compass enables transparent tracking of humanitarian impact and community transformation." },
-      { name: "twitter:description", content: "Community Compass enables transparent tracking of humanitarian impact and community transformation." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/15cb4f47-5343-48e3-8508-32c4f3aaad95/id-preview-3c8dfabd--5100aaf9-b8e7-4358-bcbb-0d766bd55af1.lovable.app-1780413661736.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/15cb4f47-5343-48e3-8508-32c4f3aaad95/id-preview-3c8dfabd--5100aaf9-b8e7-4358-bcbb-0d766bd55af1.lovable.app-1780413661736.png" },
     ],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -130,11 +126,12 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <AuthProvider>
+        <Outlet />
+        <Toaster position="top-right" richColors closeButton />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

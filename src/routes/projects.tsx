@@ -1,8 +1,10 @@
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { PageShell, PageHeader } from "@/components/PageShell";
 import { SupportDialog } from "@/components/SupportDialog";
-import { useAtlas } from "@/lib/atlas-store";
+import { projectsQuery } from "@/lib/atlas-queries";
+import { projectImage } from "@/lib/project-images";
 
 export const Route = createFileRoute("/projects")({
   head: () => ({
@@ -19,7 +21,7 @@ export const Route = createFileRoute("/projects")({
 const categories = ["All", "Water & Energy", "Economic", "Education", "Climate", "Food Security", "Healthcare"];
 
 function Projects() {
-  const projects = useAtlas((s) => s.projects);
+  const { data: projects = [] } = useQuery(projectsQuery);
   const [filter, setFilter] = useState("All");
   const visible = filter === "All" ? projects : projects.filter((p) => p.category === filter);
 
@@ -38,9 +40,7 @@ function Projects() {
                 key={c}
                 onClick={() => setFilter(c)}
                 className={`rounded-full px-4 py-1.5 text-xs font-medium ring-1 transition-colors ${
-                  filter === c
-                    ? "bg-ink text-sand ring-ink"
-                    : "bg-card text-ink/70 ring-ink/10 hover:bg-sand-deep"
+                  filter === c ? "bg-ink text-sand ring-ink" : "bg-card text-ink/70 ring-ink/10 hover:bg-sand-deep"
                 }`}
               >
                 {c}
@@ -50,7 +50,7 @@ function Projects() {
 
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
             {visible.map((p) => {
-              const pct = Math.round((p.raised / p.goal) * 100);
+              const pct = Math.round((p.raised_cents / Math.max(1, p.goal_cents)) * 100);
               return (
                 <article
                   key={p.id}
@@ -58,11 +58,9 @@ function Projects() {
                 >
                   <Link to="/projects/$id" params={{ id: p.slug }} className="aspect-[4/3] overflow-hidden bg-sand-deep">
                     <img
-                      src={p.image}
+                      src={projectImage(p.image_key)}
                       alt={p.title}
                       loading="lazy"
-                      width={1024}
-                      height={768}
                       className="size-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                     />
                   </Link>
@@ -71,19 +69,19 @@ function Projects() {
                       <span className="font-mono text-[10px] uppercase tracking-widest text-moss">{p.category}</span>
                       <div className="flex items-center gap-1.5">
                         <span className="size-2 rounded-full bg-moss" />
-                        <span className="text-[11px] font-semibold text-moss">{p.verified}% Verified</span>
+                        <span className="text-[11px] font-semibold text-moss">{p.verified_score}% Verified</span>
                       </div>
                     </div>
                     <Link to="/projects/$id" params={{ id: p.slug }} className="font-serif text-xl font-medium leading-snug hover:text-moss">
                       {p.title}
                     </Link>
                     <p className="mt-1 font-mono text-[11px] text-ink/45">{p.location}</p>
-                    <p className="mt-3 text-sm leading-relaxed text-ink/65">{p.desc}</p>
+                    <p className="mt-3 text-sm leading-relaxed text-ink/65">{p.description}</p>
 
                     <div className="mt-6 space-y-3">
                       <div className="flex justify-between text-xs font-medium tabular-nums">
-                        <span>${p.raised.toLocaleString()}</span>
-                        <span className="text-ink/45">of ${p.goal.toLocaleString()}</span>
+                        <span>${(p.raised_cents / 100).toLocaleString()}</span>
+                        <span className="text-ink/45">of ${(p.goal_cents / 100).toLocaleString()}</span>
                       </div>
                       <div className="h-1 w-full overflow-hidden rounded-full bg-sand-deep">
                         <div className="h-full rounded-full bg-moss transition-all" style={{ width: `${pct}%` }} />
