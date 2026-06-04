@@ -13,10 +13,15 @@ import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as ImpactRouteImport } from './routes/impact'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CommunitiesRouteImport } from './routes/communities'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AtlasAiRouteImport } from './routes/atlas-ai'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ReceiptsIdRouteImport } from './routes/receipts.$id'
 import { Route as ProjectsIdRouteImport } from './routes/projects.$id'
 import { Route as CommunitiesIdRouteImport } from './routes/communities.$id'
+import { Route as ImpactEvidenceIdRouteImport } from './routes/impact.evidence.$id'
+import { Route as AuthenticatedImpactUploadRouteImport } from './routes/_authenticated/impact.upload'
 
 const ProjectsRoute = ProjectsRouteImport.update({
   id: '/projects',
@@ -38,14 +43,28 @@ const CommunitiesRoute = CommunitiesRouteImport.update({
   path: '/communities',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AtlasAiRoute = AtlasAiRouteImport.update({
   id: '/atlas-ai',
   path: '/atlas-ai',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReceiptsIdRoute = ReceiptsIdRouteImport.update({
+  id: '/receipts/$id',
+  path: '/receipts/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProjectsIdRoute = ProjectsIdRouteImport.update({
@@ -58,78 +77,118 @@ const CommunitiesIdRoute = CommunitiesIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => CommunitiesRoute,
 } as any)
+const ImpactEvidenceIdRoute = ImpactEvidenceIdRouteImport.update({
+  id: '/evidence/$id',
+  path: '/evidence/$id',
+  getParentRoute: () => ImpactRoute,
+} as any)
+const AuthenticatedImpactUploadRoute =
+  AuthenticatedImpactUploadRouteImport.update({
+    id: '/impact/upload',
+    path: '/impact/upload',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/atlas-ai': typeof AtlasAiRoute
+  '/auth': typeof AuthRoute
   '/communities': typeof CommunitiesRouteWithChildren
   '/dashboard': typeof DashboardRoute
-  '/impact': typeof ImpactRoute
+  '/impact': typeof ImpactRouteWithChildren
   '/projects': typeof ProjectsRouteWithChildren
   '/communities/$id': typeof CommunitiesIdRoute
   '/projects/$id': typeof ProjectsIdRoute
+  '/receipts/$id': typeof ReceiptsIdRoute
+  '/impact/upload': typeof AuthenticatedImpactUploadRoute
+  '/impact/evidence/$id': typeof ImpactEvidenceIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/atlas-ai': typeof AtlasAiRoute
+  '/auth': typeof AuthRoute
   '/communities': typeof CommunitiesRouteWithChildren
   '/dashboard': typeof DashboardRoute
-  '/impact': typeof ImpactRoute
+  '/impact': typeof ImpactRouteWithChildren
   '/projects': typeof ProjectsRouteWithChildren
   '/communities/$id': typeof CommunitiesIdRoute
   '/projects/$id': typeof ProjectsIdRoute
+  '/receipts/$id': typeof ReceiptsIdRoute
+  '/impact/upload': typeof AuthenticatedImpactUploadRoute
+  '/impact/evidence/$id': typeof ImpactEvidenceIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/atlas-ai': typeof AtlasAiRoute
+  '/auth': typeof AuthRoute
   '/communities': typeof CommunitiesRouteWithChildren
   '/dashboard': typeof DashboardRoute
-  '/impact': typeof ImpactRoute
+  '/impact': typeof ImpactRouteWithChildren
   '/projects': typeof ProjectsRouteWithChildren
   '/communities/$id': typeof CommunitiesIdRoute
   '/projects/$id': typeof ProjectsIdRoute
+  '/receipts/$id': typeof ReceiptsIdRoute
+  '/_authenticated/impact/upload': typeof AuthenticatedImpactUploadRoute
+  '/impact/evidence/$id': typeof ImpactEvidenceIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/atlas-ai'
+    | '/auth'
     | '/communities'
     | '/dashboard'
     | '/impact'
     | '/projects'
     | '/communities/$id'
     | '/projects/$id'
+    | '/receipts/$id'
+    | '/impact/upload'
+    | '/impact/evidence/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/atlas-ai'
+    | '/auth'
     | '/communities'
     | '/dashboard'
     | '/impact'
     | '/projects'
     | '/communities/$id'
     | '/projects/$id'
+    | '/receipts/$id'
+    | '/impact/upload'
+    | '/impact/evidence/$id'
   id:
     | '__root__'
     | '/'
+    | '/_authenticated'
     | '/atlas-ai'
+    | '/auth'
     | '/communities'
     | '/dashboard'
     | '/impact'
     | '/projects'
     | '/communities/$id'
     | '/projects/$id'
+    | '/receipts/$id'
+    | '/_authenticated/impact/upload'
+    | '/impact/evidence/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AtlasAiRoute: typeof AtlasAiRoute
+  AuthRoute: typeof AuthRoute
   CommunitiesRoute: typeof CommunitiesRouteWithChildren
   DashboardRoute: typeof DashboardRoute
-  ImpactRoute: typeof ImpactRoute
+  ImpactRoute: typeof ImpactRouteWithChildren
   ProjectsRoute: typeof ProjectsRouteWithChildren
+  ReceiptsIdRoute: typeof ReceiptsIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -162,6 +221,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CommunitiesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/atlas-ai': {
       id: '/atlas-ai'
       path: '/atlas-ai'
@@ -169,11 +235,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AtlasAiRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/receipts/$id': {
+      id: '/receipts/$id'
+      path: '/receipts/$id'
+      fullPath: '/receipts/$id'
+      preLoaderRoute: typeof ReceiptsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/projects/$id': {
@@ -190,8 +270,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CommunitiesIdRouteImport
       parentRoute: typeof CommunitiesRoute
     }
+    '/impact/evidence/$id': {
+      id: '/impact/evidence/$id'
+      path: '/evidence/$id'
+      fullPath: '/impact/evidence/$id'
+      preLoaderRoute: typeof ImpactEvidenceIdRouteImport
+      parentRoute: typeof ImpactRoute
+    }
+    '/_authenticated/impact/upload': {
+      id: '/_authenticated/impact/upload'
+      path: '/impact/upload'
+      fullPath: '/impact/upload'
+      preLoaderRoute: typeof AuthenticatedImpactUploadRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
+
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedImpactUploadRoute: typeof AuthenticatedImpactUploadRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedImpactUploadRoute: AuthenticatedImpactUploadRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
 interface CommunitiesRouteChildren {
   CommunitiesIdRoute: typeof CommunitiesIdRoute
@@ -204,6 +309,17 @@ const CommunitiesRouteChildren: CommunitiesRouteChildren = {
 const CommunitiesRouteWithChildren = CommunitiesRoute._addFileChildren(
   CommunitiesRouteChildren,
 )
+
+interface ImpactRouteChildren {
+  ImpactEvidenceIdRoute: typeof ImpactEvidenceIdRoute
+}
+
+const ImpactRouteChildren: ImpactRouteChildren = {
+  ImpactEvidenceIdRoute: ImpactEvidenceIdRoute,
+}
+
+const ImpactRouteWithChildren =
+  ImpactRoute._addFileChildren(ImpactRouteChildren)
 
 interface ProjectsRouteChildren {
   ProjectsIdRoute: typeof ProjectsIdRoute
@@ -219,11 +335,14 @@ const ProjectsRouteWithChildren = ProjectsRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AtlasAiRoute: AtlasAiRoute,
+  AuthRoute: AuthRoute,
   CommunitiesRoute: CommunitiesRouteWithChildren,
   DashboardRoute: DashboardRoute,
-  ImpactRoute: ImpactRoute,
+  ImpactRoute: ImpactRouteWithChildren,
   ProjectsRoute: ProjectsRouteWithChildren,
+  ReceiptsIdRoute: ReceiptsIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
