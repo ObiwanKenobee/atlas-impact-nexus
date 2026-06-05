@@ -88,9 +88,15 @@ function answer(
       .sort((a, b) => trustScore(b.t) - trustScore(a.t))
       .slice(0, 3);
     ranked.forEach((r) => r.p && cites.push(projCite(r.p)));
+    const topProject = ranked[0]?.p;
+    const supporting = topProject
+      ? evidence.find((e) => e.project_id === topProject.id)
+      : undefined;
+    if (supporting) cites.push(evCite(supporting));
     const lines = ranked.map((r) => `${r.p!.title} (${trustScore(r.t)}%)`).join(", ");
     return {
       text: `Strongest trust scores: ${lines || "no breakdown data yet"}. Weighting: GPS 28% · Beneficiaries 26% · Audits 24% · Media/IoT 22%.`,
+      snippet: supporting ? snippetFor(supporting) : undefined,
       citations: cites,
     };
   }
@@ -167,7 +173,18 @@ function AtlasAI() {
   function send(text: string) {
     if (!text.trim()) return;
     const a = answer(text, { projects, communities, evidence, trust });
-    setMsgs((m) => [...m, { role: "user", text }, { role: "ai", text: a.text, snippet: a.snippet, citations: a.citations }]);
+    // Guarantee every answer carries an evidence snippet — fall back to first cited evidence.
+    let snippet = a.snippet;
+    if (!snippet) {
+      const evCite = a.citations.find((c) => c.kind === "evidence");
+      if (evCite && evCite.kind === "evidence") snippet = evCite.snippet;
+      else if (evidence[0]) snippet = snippetFor(evidence[0]);
+    }
+    setMsgs((m) => [
+      ...m,
+      { role: "user", text },
+      { role: "ai", text: a.text, snippet, citations: a.citations },
+    ]);
     setInput("");
   }
 
