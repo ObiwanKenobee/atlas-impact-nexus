@@ -88,9 +88,15 @@ function answer(
       .sort((a, b) => trustScore(b.t) - trustScore(a.t))
       .slice(0, 3);
     ranked.forEach((r) => r.p && cites.push(projCite(r.p)));
+    const topProject = ranked[0]?.p;
+    const supporting = topProject
+      ? evidence.find((e) => e.project_id === topProject.id)
+      : undefined;
+    if (supporting) cites.push(evCite(supporting));
     const lines = ranked.map((r) => `${r.p!.title} (${trustScore(r.t)}%)`).join(", ");
     return {
       text: `Strongest trust scores: ${lines || "no breakdown data yet"}. Weighting: GPS 28% · Beneficiaries 26% · Audits 24% · Media/IoT 22%.`,
+      snippet: supporting ? snippetFor(supporting) : undefined,
       citations: cites,
     };
   }
