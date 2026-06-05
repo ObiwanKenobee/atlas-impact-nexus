@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { Camera, FileText, MapPin, Radio, Upload, Users, Video } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { PageShell, PageHeader } from "@/components/PageShell";
 import { useAuth } from "@/hooks/use-auth";
@@ -30,6 +30,10 @@ const kinds: { id: EvidenceKind; label: string; icon: typeof MapPin; desc: strin
   { id: "BENEFICIARY", label: "Beneficiary ack.", icon: Users, desc: "Recipient acknowledgement" },
 ];
 
+type Errors = Partial<
+  Record<"projectId" | "title" | "file" | "iot" | "report" | "gps", string>
+>;
+
 function UploadEvidence() {
   const { user } = useAuth();
   const { data: projects } = useQuery(projectsQuery);
@@ -48,6 +52,22 @@ function UploadEvidence() {
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
+  const [errors, setErrors] = useState<Errors>({});
+
+  const needsFile = kind === "PHOTO" || kind === "VIDEO";
+  const needsGps = kind === "GPS";
+  const needsIot = kind === "IoT";
+  const needsReport = kind === "REPORT" || kind === "BENEFICIARY";
+
+  const iotPreview = useMemo(() => {
+    if (!needsIot) return { ok: true as const };
+    try {
+      JSON.parse(iotJson);
+      return { ok: true as const };
+    } catch (e) {
+      return { ok: false as const, msg: e instanceof Error ? e.message : "invalid JSON" };
+    }
+  }, [iotJson, needsIot]);
 
   function useMyLocation() {
     if (!navigator.geolocation) return toast.error("Geolocation unavailable");
@@ -55,40 +75,43 @@ function UploadEvidence() {
       (pos) => {
         setLat(pos.coords.latitude.toFixed(6));
         setLng(pos.coords.longitude.toFixed(6));
+        setErrors((e) => ({ ...e, gps: undefined }));
         toast.success("Captured current location");
       },
       (err) => toast.error(err.message),
     );
   }
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!user) return;
-    if (!projectId) return toast.error("Pick a project to link this evidence to");
-    if (!title.trim()) return toast.error("Add a title");
-
-    let media_url: string | null = null;
-    let iot_payload: Record<string, unknown> | null = null;
-
-    if (kind === "PHOTO" || kind === "VIDEO") {
-      if (!file) return toast.error("Choose a file to upload");
+  function validate(): Errors {
+    const e: Errors = {};
+    if (!projectId) e.projectId = "Pick a project to link this evidence to.";
+    if (!title.trim()) e.title = "Add a short title (≤160 chars).";
+    if (needsFile && !file) e.file = `Attach a ${kind === "PHOTO" ? "photo" : "video"} file.`;
+    if (needsFile && file) {
       const max = kind === "PHOTO" ? 20 * 1024 * 1024 : 50 * 1024 * 1024;
-      if (file.size > max) return toast.error(`File too large (max ${max / 1024 / 1024}MB)`);
+      if (file.size > max) e.file = `File too large — max ${max / 1024 / 1024}MB.`;
     }
-    if (kind === "IoT") {
-      try {
-        iot_payload = JSON.parse(iotJson);
-      } catch {
-        return toast.error("IoT payload must be valid JSON");
-      }
+    if (needsGps && (!lat || !lng)) e.gps = "Capture or enter both latitude and longitude.";
+    if (needsIot && !iotPreview.ok) e.iot = `Invalid JSON: ${iotPreview.msg}`;
+    if (needsReport && !reportText.trim()) e.report = "Write the field report narrative.";
+    return e;
+  }
+
+  async function submit(ev: React.FormEvent) {
+    ev.preventDefault();
+    if (!user) return;
+    const v = validate();
+    setErrors(v);
+    if (Object.keys(v).length) {
+      toast.error("Fix the highlighted fields and resubmit.");
+      return;
     }
-    if (kind === "REPORT" && !reportText.trim()) return toast.error("Write a field report");
-    if (kind === "GPS" && (!lat || !lng)) return toast.error("Capture or enter coordinates");
 
     setBusy(true);
     try {
+      let media_url: string | null = null;
       if (file) {
-        setProgress("Uploading media…");
+        setProgress(`Uploading ${file.name} (${(file.size / 1024 / 1024).toFixed(1)}MB)…`);
         const ext = file.name.split(".").pop() ?? "bin";
         const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
         const { error: upErr } = await supabase.storage
@@ -97,7 +120,7 @@ function UploadEvidence() {
         if (upErr) throw upErr;
         media_url = path;
       }
-      setProgress("Recording on ledger…");
+      setProgress("Signing entry & recording on ledger…");
       const { id } = await create({
         data: {
           project_id: projectId,
@@ -107,8 +130,8 @@ function UploadEvidence() {
           lat: lat ? Number(lat) : null,
           lng: lng ? Number(lng) : null,
           media_url,
-          iot_payload,
-          report_text: kind === "REPORT" ? reportText.trim() : null,
+          iot_payload: needsIot ? JSON.parse(iotJson) : null,
+          report_text: needsReport ? reportText.trim() : null,
           captured_at: new Date().toISOString(),
         },
       });
@@ -136,6 +159,7 @@ function UploadEvidence() {
       <section className="px-6 py-12">
         <form
           onSubmit={submit}
+          noValidate
           className="mx-auto grid max-w-5xl gap-8 lg:grid-cols-[260px_1fr]"
         >
           <aside>
@@ -149,7 +173,10 @@ function UploadEvidence() {
                   <button
                     key={k.id}
                     type="button"
-                    onClick={() => setKind(k.id)}
+                    onClick={() => {
+                      setKind(k.id);
+                      setErrors({});
+                    }}
                     className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-left ring-1 transition-colors ${
                       active
                         ? "bg-ink text-sand ring-ink"
@@ -167,15 +194,24 @@ function UploadEvidence() {
                 );
               })}
             </div>
+            <p className="mt-4 rounded-xl bg-sand-deep/60 p-3 font-mono text-[10px] leading-relaxed text-ink/55">
+              Each entry is signed by your account, time-stamped, and pinned to a project. Trust score
+              recomputes immediately after submit.
+            </p>
           </aside>
 
           <div className="space-y-5 rounded-2xl bg-card p-8 ring-1 ring-ink/5">
-            <Field label="Project link (required)">
+            <Field label="Project link" required error={errors.projectId}>
               <select
-                required
                 value={projectId}
-                onChange={(e) => setProjectId(e.target.value)}
-                className="w-full rounded-xl bg-sand-deep px-4 py-2.5 text-sm ring-1 ring-ink/5 focus:outline-none focus:ring-moss"
+                onChange={(e) => {
+                  setProjectId(e.target.value);
+                  setErrors((x) => ({ ...x, projectId: undefined }));
+                }}
+                aria-invalid={!!errors.projectId}
+                className={`w-full rounded-xl bg-sand-deep px-4 py-2.5 text-sm ring-1 focus:outline-none focus:ring-moss ${
+                  errors.projectId ? "ring-earth" : "ring-ink/5"
+                }`}
               >
                 <option value="">Choose a project…</option>
                 {projects?.map((p) => (
@@ -186,18 +222,23 @@ function UploadEvidence() {
               </select>
             </Field>
 
-            <Field label="Title">
+            <Field label="Title" required error={errors.title} hint={`${title.length}/160`}>
               <input
-                required
                 maxLength={160}
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  setErrors((x) => ({ ...x, title: undefined }));
+                }}
+                aria-invalid={!!errors.title}
                 placeholder="Solar pump install verified at Well #4"
-                className="w-full rounded-xl bg-sand-deep px-4 py-2.5 text-sm ring-1 ring-ink/5 focus:outline-none focus:ring-moss"
+                className={`w-full rounded-xl bg-sand-deep px-4 py-2.5 text-sm ring-1 focus:outline-none focus:ring-moss ${
+                  errors.title ? "ring-earth" : "ring-ink/5"
+                }`}
               />
             </Field>
 
-            <Field label="Short context (optional)">
+            <Field label="Short context (optional)" hint={`${meta.length}/280`}>
               <input
                 maxLength={280}
                 value={meta}
@@ -207,24 +248,35 @@ function UploadEvidence() {
               />
             </Field>
 
-            {(kind === "GPS" || kind === "PHOTO" || kind === "VIDEO") && (
-              <Field label="Coordinates">
+            {(needsGps || needsFile) && (
+              <Field
+                label="Coordinates"
+                required={needsGps}
+                error={errors.gps}
+                hint="Decimal degrees, WGS84."
+              >
                 <div className="flex flex-wrap items-center gap-2">
                   <input
                     type="number"
                     step="0.000001"
-                    placeholder="Latitude"
+                    placeholder="Latitude (-90 to 90)"
                     value={lat}
-                    onChange={(e) => setLat(e.target.value)}
-                    className="w-40 rounded-xl bg-sand-deep px-4 py-2.5 text-sm ring-1 ring-ink/5 focus:outline-none focus:ring-moss"
+                    onChange={(e) => {
+                      setLat(e.target.value);
+                      setErrors((x) => ({ ...x, gps: undefined }));
+                    }}
+                    className="w-48 rounded-xl bg-sand-deep px-4 py-2.5 text-sm ring-1 ring-ink/5 focus:outline-none focus:ring-moss"
                   />
                   <input
                     type="number"
                     step="0.000001"
-                    placeholder="Longitude"
+                    placeholder="Longitude (-180 to 180)"
                     value={lng}
-                    onChange={(e) => setLng(e.target.value)}
-                    className="w-40 rounded-xl bg-sand-deep px-4 py-2.5 text-sm ring-1 ring-ink/5 focus:outline-none focus:ring-moss"
+                    onChange={(e) => {
+                      setLng(e.target.value);
+                      setErrors((x) => ({ ...x, gps: undefined }));
+                    }}
+                    className="w-48 rounded-xl bg-sand-deep px-4 py-2.5 text-sm ring-1 ring-ink/5 focus:outline-none focus:ring-moss"
                   />
                   <button
                     type="button"
@@ -237,39 +289,84 @@ function UploadEvidence() {
               </Field>
             )}
 
-            {(kind === "PHOTO" || kind === "VIDEO") && (
-              <Field label={kind === "PHOTO" ? "Photo file" : "Video file"}>
+            {needsFile && (
+              <Field
+                label={kind === "PHOTO" ? "Photo file" : "Video file"}
+                required
+                error={errors.file}
+                hint={
+                  file
+                    ? `${file.name} · ${(file.size / 1024 / 1024).toFixed(2)}MB`
+                    : kind === "PHOTO"
+                      ? "JPG/PNG/WebP up to 20MB."
+                      : "MP4/MOV up to 50MB."
+                }
+              >
                 <input
                   type="file"
                   accept={kind === "PHOTO" ? "image/*" : "video/*"}
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  onChange={(e) => {
+                    setFile(e.target.files?.[0] ?? null);
+                    setErrors((x) => ({ ...x, file: undefined }));
+                  }}
                   className="block w-full text-sm text-ink/75 file:mr-3 file:rounded-full file:border-0 file:bg-ink file:px-4 file:py-2 file:text-sand hover:file:bg-moss"
                 />
               </Field>
             )}
 
-            {kind === "IoT" && (
-              <Field label="Sensor JSON payload">
+            {needsIot && (
+              <Field
+                label="Sensor JSON payload"
+                required
+                error={errors.iot}
+                hint={iotPreview.ok ? "Valid JSON ✓" : "Use double-quoted keys & values."}
+              >
                 <textarea
                   rows={6}
                   value={iotJson}
-                  onChange={(e) => setIotJson(e.target.value)}
-                  className="w-full rounded-xl bg-sand-deep px-4 py-3 font-mono text-xs ring-1 ring-ink/5 focus:outline-none focus:ring-moss"
+                  onChange={(e) => {
+                    setIotJson(e.target.value);
+                    setErrors((x) => ({ ...x, iot: undefined }));
+                  }}
+                  aria-invalid={!iotPreview.ok}
+                  className={`w-full rounded-xl bg-sand-deep px-4 py-3 font-mono text-xs ring-1 focus:outline-none focus:ring-moss ${
+                    iotPreview.ok ? "ring-ink/5" : "ring-earth"
+                  }`}
                 />
               </Field>
             )}
 
-            {kind === "REPORT" && (
-              <Field label="Field report">
+            {needsReport && (
+              <Field
+                label="Field report"
+                required
+                error={errors.report}
+                hint={`${reportText.length}/8000`}
+              >
                 <textarea
                   rows={8}
                   maxLength={8000}
                   value={reportText}
-                  onChange={(e) => setReportText(e.target.value)}
+                  onChange={(e) => {
+                    setReportText(e.target.value);
+                    setErrors((x) => ({ ...x, report: undefined }));
+                  }}
+                  aria-invalid={!!errors.report}
                   placeholder="Observations, beneficiary count, conditions, follow-ups…"
-                  className="w-full rounded-xl bg-sand-deep px-4 py-3 text-sm ring-1 ring-ink/5 focus:outline-none focus:ring-moss"
+                  className={`w-full rounded-xl bg-sand-deep px-4 py-3 text-sm ring-1 focus:outline-none focus:ring-moss ${
+                    errors.report ? "ring-earth" : "ring-ink/5"
+                  }`}
                 />
               </Field>
+            )}
+
+            {progress && (
+              <div className="rounded-xl bg-moss-soft/60 px-4 py-3">
+                <p className="flex items-center gap-2 font-mono text-[11px] text-moss">
+                  <span className="size-1.5 animate-pulse rounded-full bg-moss" />
+                  {progress}
+                </p>
+              </div>
             )}
 
             <div className="flex items-center justify-between pt-2">
@@ -282,7 +379,7 @@ function UploadEvidence() {
                 className="inline-flex items-center gap-2 rounded-full bg-ink px-5 py-3 text-sm font-medium text-sand hover:bg-moss disabled:opacity-60"
               >
                 <Upload className="size-4" />
-                {busy ? progress || "Submitting…" : "Submit to ledger"}
+                {busy ? "Submitting…" : "Submit to ledger"}
               </button>
             </div>
           </div>
@@ -292,13 +389,30 @@ function UploadEvidence() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  required,
+  error,
+  hint,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  error?: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
     <label className="block">
-      <span className="mb-1 block font-mono text-[10px] uppercase tracking-widest text-ink/50">
-        {label}
+      <span className="mb-1 flex items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-widest text-ink/50">
+        <span>
+          {label}
+          {required && <span className="ml-1 text-earth">*</span>}
+        </span>
+        {hint && !error && <span className="normal-case tracking-normal text-ink/40">{hint}</span>}
       </span>
       {children}
+      {error && <p className="mt-1.5 font-mono text-[11px] text-earth">{error}</p>}
     </label>
   );
 }
