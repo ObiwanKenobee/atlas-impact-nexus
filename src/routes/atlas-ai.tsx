@@ -167,7 +167,18 @@ function AtlasAI() {
   function send(text: string) {
     if (!text.trim()) return;
     const a = answer(text, { projects, communities, evidence, trust });
-    setMsgs((m) => [...m, { role: "user", text }, { role: "ai", text: a.text, snippet: a.snippet, citations: a.citations }]);
+    // Guarantee every answer carries an evidence snippet — fall back to first cited evidence.
+    let snippet = a.snippet;
+    if (!snippet) {
+      const evCite = a.citations.find((c) => c.kind === "evidence");
+      if (evCite && evCite.kind === "evidence") snippet = evCite.snippet;
+      else if (evidence[0]) snippet = snippetFor(evidence[0]);
+    }
+    setMsgs((m) => [
+      ...m,
+      { role: "user", text },
+      { role: "ai", text: a.text, snippet, citations: a.citations },
+    ]);
     setInput("");
   }
 
