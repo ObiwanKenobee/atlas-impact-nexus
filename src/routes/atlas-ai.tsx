@@ -30,11 +30,11 @@ export const Route = createFileRoute("/atlas-ai")({
 });
 
 type Citation =
-  | { kind: "project"; slug: string; label: string }
-  | { kind: "community"; slug: string; label: string }
-  | { kind: "evidence"; id: string; label: string; snippet: string };
+  | { kind: "project"; slug: string; label: string; resolved: boolean }
+  | { kind: "community"; slug: string; label: string; resolved: boolean }
+  | { kind: "evidence"; id: string; label: string; snippet: string; resolved: boolean };
 
-type Msg = { role: "user" | "ai"; text: string; snippet?: string; citations?: Citation[] };
+type Msg = { role: "user" | "ai"; text: string; snippet?: string; citations?: Citation[]; unresolved?: number };
 
 const suggestions = [
   "Where did my money go this quarter?",
@@ -63,9 +63,9 @@ function answer(
   const { projects, communities, evidence, trust } = data;
   const lq = q.toLowerCase();
   const cites: Citation[] = [];
-  const projCite = (p: ProjectRow): Citation => ({ kind: "project", slug: p.slug, label: p.title });
-  const commCite = (c: CommunityRow): Citation => ({ kind: "community", slug: c.slug, label: c.name });
-  const evCite = (e: EvidenceRow): Citation => ({ kind: "evidence", id: e.id, label: e.title, snippet: snippetFor(e) });
+  const projCite = (p: ProjectRow): Citation => ({ kind: "project", slug: p.slug, label: p.title, resolved: true });
+  const commCite = (c: CommunityRow): Citation => ({ kind: "community", slug: c.slug, label: c.name, resolved: true });
+  const evCite = (e: EvidenceRow): Citation => ({ kind: "evidence", id: e.id, label: e.title, snippet: snippetFor(e), resolved: true });
 
   if (lq.includes("money") || lq.includes("funded") || lq.includes("donor") || lq.includes("quarter")) {
     const totalRaised = projects.reduce((s, p) => s + p.raised_cents, 0) / 100;
@@ -173,17 +173,26 @@ function AtlasAI() {
   function send(text: string) {
     if (!text.trim()) return;
     const a = answer(text, { projects, communities, evidence, trust });
-    // Guarantee every answer carries an evidence snippet — fall back to first cited evidence.
+    // Strict citation validator: every citation must resolve to a live record.
+    const projectSlugs = new Set(projects.map((p) => p.slug));
+    const communitySlugs = new Set(communities.map((c) => c.slug));
+    const evidenceIds = new Set(evidence.map((e) => e.id));
+    const validated: Citation[] = a.citations.map((c) => {
+      if (c.kind === "project") return { ...c, resolved: projectSlugs.has(c.slug) };
+      if (c.kind === "community") return { ...c, resolved: communitySlugs.has(c.slug) };
+      return { ...c, resolved: evidenceIds.has(c.id) };
+    });
+    const unresolved = validated.filter((c) => !c.resolved).length;
     let snippet = a.snippet;
     if (!snippet) {
-      const evCite = a.citations.find((c) => c.kind === "evidence");
+      const evCite = validated.find((c) => c.kind === "evidence" && c.resolved);
       if (evCite && evCite.kind === "evidence") snippet = evCite.snippet;
       else if (evidence[0]) snippet = snippetFor(evidence[0]);
     }
     setMsgs((m) => [
       ...m,
       { role: "user", text },
-      { role: "ai", text: a.text, snippet, citations: a.citations },
+      { role: "ai", text: a.text, snippet, citations: validated, unresolved },
     ]);
     setInput("");
   }
