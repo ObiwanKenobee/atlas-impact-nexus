@@ -26,8 +26,74 @@ function toCsv(rows: Record<string, unknown>[]): string {
   ].join("\n");
 }
 
-export function exportEvidenceCsv(rows: EvidenceRow[]) {
-  download("atlas-evidence-ledger.csv", toCsv(rows as unknown as Record<string, unknown>[]), "text/csv");
+export function exportEvidenceCsv(rows: EvidenceRow[], trustImpact?: (r: EvidenceRow) => number) {
+  const out = rows.map((r) => ({
+    id: r.id,
+    project_id: r.project_id,
+    kind: r.kind,
+    title: r.title,
+    meta: r.meta ?? "",
+    lat: r.lat ?? "",
+    lng: r.lng ?? "",
+    media_url: r.media_url ?? "",
+    iot_payload: r.iot_payload ?? "",
+    report_text: r.report_text ?? "",
+    captured_at: r.captured_at,
+    trust_impact_points: trustImpact ? Number(trustImpact(r).toFixed(2)) : "",
+  }));
+  download("atlas-evidence-ledger.csv", toCsv(out as unknown as Record<string, unknown>[]), "text/csv");
+}
+
+export function exportEvidencePdf(args: {
+  rows: EvidenceRow[];
+  filterSummary: string;
+  trustImpact: (r: EvidenceRow) => number;
+  projectTitle?: (id: string) => string;
+}) {
+  const { rows, filterSummary, trustImpact, projectTitle } = args;
+  const doc = new jsPDF({ unit: "pt", format: "letter" });
+  doc.setFont("times", "normal");
+
+  doc.setFontSize(10);
+  doc.text("ATLAS SANCTUM · EVIDENCE EXPORT", 56, 64);
+  doc.setLineWidth(0.5);
+  doc.line(56, 72, 540, 72);
+
+  doc.setFontSize(18);
+  doc.text("Filtered evidence ledger", 56, 100);
+  doc.setFontSize(10);
+  doc.text(filterSummary, 56, 118, { maxWidth: 484 });
+  doc.text(`Generated ${new Date().toLocaleString()} · ${rows.length} entries`, 56, 134);
+
+  const totalImpact = rows.reduce((s, r) => s + trustImpact(r), 0);
+  doc.setFontSize(11);
+  doc.text(`Total trust-score impact: ${totalImpact.toFixed(1)} pts`, 56, 158);
+
+  doc.setFontSize(9);
+  let y = 188;
+  doc.text("DATE        KIND        TITLE", 56, y);
+  doc.text("PROJECT", 360, y);
+  doc.text("IMPACT", 500, y);
+  y += 6;
+  doc.line(56, y, 540, y);
+  y += 12;
+
+  rows.forEach((r) => {
+    if (y > 740) {
+      doc.addPage();
+      y = 64;
+    }
+    const date = new Date(r.captured_at).toISOString().slice(0, 10);
+    const title = r.title.length > 38 ? `${r.title.slice(0, 35)}…` : r.title;
+    const pTitle = projectTitle?.(r.project_id) ?? r.project_id;
+    const pShort = pTitle.length > 22 ? `${pTitle.slice(0, 20)}…` : pTitle;
+    doc.text(`${date}  ${r.kind.padEnd(10)} ${title}`, 56, y);
+    doc.text(pShort, 360, y);
+    doc.text(`+${trustImpact(r).toFixed(1)}`, 500, y);
+    y += 14;
+  });
+
+  doc.save(`atlas-evidence-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
 export function exportTransactionsCsv(rows: TransactionRow[]) {
