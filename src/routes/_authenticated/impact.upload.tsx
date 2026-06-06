@@ -30,6 +30,79 @@ const kinds: { id: EvidenceKind; label: string; icon: typeof MapPin; desc: strin
   { id: "BENEFICIARY", label: "Beneficiary ack.", icon: Users, desc: "Recipient acknowledgement" },
 ];
 
+type Template = {
+  id: string;
+  label: string;
+  kind: EvidenceKind;
+  title: string;
+  meta?: string;
+  reportText?: string;
+  iotJson?: string;
+  gps?: { lat: string; lng: string };
+  hint: string;
+};
+
+const templates: Template[] = [
+  {
+    id: "tpl-gps",
+    label: "GPS site check-in",
+    kind: "GPS",
+    title: "Field-team check-in at project site",
+    meta: "Coordinates captured at install point",
+    gps: { lat: "3.119000", lng: "35.597000" },
+    hint: "Prefills a GPS check-in. Tap “Use my location” to overwrite.",
+  },
+  {
+    id: "tpl-photo",
+    label: "Install photo",
+    kind: "PHOTO",
+    title: "Solar pump install photo · Well #4",
+    meta: "Single JPG, taken on completion day",
+    hint: "Prefills a photo entry — attach a JPG/PNG up to 20MB.",
+  },
+  {
+    id: "tpl-video",
+    label: "Beneficiary video testimony",
+    kind: "VIDEO",
+    title: "Beneficiary testimony · 30s clip",
+    meta: "MP4 testimonial captured on phone",
+    hint: "Prefills a video entry — attach a clip up to 50MB.",
+  },
+  {
+    id: "tpl-iot",
+    label: "IoT pump reading",
+    kind: "IoT",
+    title: "Daily pump throughput · litres/day",
+    meta: "Sensor pings every 6h, aggregated daily",
+    iotJson: JSON.stringify(
+      { sensor: "pump-04", value: 4210, unit: "L/day", battery: 0.82 },
+      null,
+      2,
+    ),
+    hint: "Prefills a valid IoT JSON payload — edit numbers to match your reading.",
+  },
+  {
+    id: "tpl-report",
+    label: "Field report (audit)",
+    kind: "REPORT",
+    title: "Weekly field report · install verified",
+    meta: "Authored by field lead",
+    reportText:
+      "Site visited on the install date. Team confirmed the pump is operational, beneficiaries acknowledged delivery, and no follow-up issues were observed. Photographs and GPS coordinates were logged separately.",
+    hint: "Prefills a narrative field report — edit the body before submitting.",
+  },
+  {
+    id: "tpl-beneficiary",
+    label: "Beneficiary ack.",
+    kind: "BENEFICIARY",
+    title: "Beneficiary acknowledgement · cohort",
+    meta: "Group of 12 households",
+    reportText:
+      "Cohort of households acknowledged receipt of clean water access. Names, signatures and photos are filed locally with the field team.",
+    hint: "Prefills a beneficiary acknowledgement — edit the cohort details before submitting.",
+  },
+];
+
 type Errors = Partial<
   Record<"projectId" | "title" | "file" | "iot" | "report" | "gps", string>
 >;
@@ -198,6 +271,35 @@ function UploadEvidence() {
               Each entry is signed by your account, time-stamped, and pinned to a project. Trust score
               recomputes immediately after submit.
             </p>
+
+            <p className="mt-6 mb-2 font-mono text-[10px] uppercase tracking-widest text-ink/50">
+              One-click templates
+            </p>
+            <div className="flex flex-col gap-1.5">
+              {templates.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => {
+                    setKind(t.kind);
+                    setTitle(t.title);
+                    setMeta(t.meta ?? "");
+                    if (t.gps) {
+                      setLat(t.gps.lat);
+                      setLng(t.gps.lng);
+                    }
+                    if (t.iotJson) setIotJson(t.iotJson);
+                    if (t.reportText) setReportText(t.reportText);
+                    setErrors({});
+                  }}
+                  title={t.hint}
+                  className="rounded-lg border border-ink/5 bg-sand px-3 py-2 text-left text-xs text-ink/75 hover:bg-sand-deep"
+                >
+                  <span className="font-medium text-ink">{t.label}</span>
+                  <span className="ml-1 font-mono text-[10px] text-ink/45">{t.kind}</span>
+                </button>
+              ))}
+            </div>
           </aside>
 
           <div className="space-y-5 rounded-2xl bg-card p-8 ring-1 ring-ink/5">

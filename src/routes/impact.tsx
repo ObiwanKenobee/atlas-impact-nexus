@@ -1,7 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowDownUp, Camera, Download, FileText, MapPin, Radio, Upload, Users, Video } from "lucide-react";
-import { useMemo, useState } from "react";
+import {
+  ArrowDownUp,
+  Bookmark,
+  BookmarkPlus,
+  Camera,
+  Download,
+  FileText,
+  MapPin,
+  Radio,
+  Trash2,
+  Upload,
+  Users,
+  Video,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { PageShell, PageHeader } from "@/components/PageShell";
 import { TrustBreakdown } from "@/components/TrustBreakdown";
 import {
@@ -12,7 +25,12 @@ import {
 } from "@/lib/atlas-queries";
 import type { EvidenceKind, EvidenceRow } from "@/lib/atlas-types";
 import { TRUST_WEIGHTS } from "@/lib/atlas-types";
-import { exportEvidenceCsv, exportTransactionsCsv, relativeTime } from "@/lib/exports";
+import {
+  exportEvidenceCsv,
+  exportEvidencePdf,
+  exportTransactionsCsv,
+  relativeTime,
+} from "@/lib/exports";
 
 export const Route = createFileRoute("/impact")({
   head: () => ({
@@ -47,7 +65,18 @@ const kindFilters: { id: "ALL" | EvidenceKind; label: string }[] = [
 
 type SortKey = "recent" | "oldest" | "trust" | "kind";
 
-// Trust-impact weight per entry kind — mirrors TRUST_WEIGHTS / max evidence per pillar.
+type SavedView = {
+  id: string;
+  name: string;
+  kind: "ALL" | EvidenceKind;
+  project: string;
+  days: string;
+  sort: SortKey;
+};
+
+const VIEWS_KEY = "atlas.evidenceViews.v1";
+const PAGE_SIZE = 10;
+
 function trustImpact(kind: EvidenceKind): number {
   switch (kind) {
     case "GPS":
@@ -73,6 +102,26 @@ function Impact() {
   const [projectFilter, setProjectFilter] = useState<string>("ALL");
   const [days, setDays] = useState<string>("ALL");
   const [sort, setSort] = useState<SortKey>("recent");
+  const [page, setPage] = useState(1);
+
+  const [views, setViews] = useState<SavedView[]>([]);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(VIEWS_KEY);
+      if (raw) setViews(JSON.parse(raw));
+    } catch {}
+  }, []);
+  function persistViews(next: SavedView[]) {
+    setViews(next);
+    try {
+      localStorage.setItem(VIEWS_KEY, JSON.stringify(next));
+    } catch {}
+  }
+
+  // Reset to page 1 whenever the filter changes.
+  useEffect(() => {
+    setPage(1);
+  }, [kindFilter, projectFilter, days, sort]);
 
   const visible = useMemo(() => {
     const now = Date.now();
@@ -94,6 +143,45 @@ function Impact() {
     });
     return sorted;
   }, [evidence, kindFilter, projectFilter, days, sort]);
+
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+  const pageItems = visible.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const projectTitleById = (id: string) => projects.find((p) => p.id === id)?.title ?? id;
+
+  function filterSummary() {
+    const parts: string[] = [];
+    parts.push(`Kind: ${kindFilter === "ALL" ? "all" : kindFilter}`);
+    parts.push(
+      `Project: ${projectFilter === "ALL" ? "all" : projectTitleById(projectFilter)}`,
+    );
+    parts.push(`Window: ${days === "ALL" ? "all time" : `last ${days} days`}`);
+    parts.push(`Sort: ${sort}`);
+    return parts.join(" · ");
+  }
+
+  function saveCurrentView() {
+    const name = prompt("Name this view (e.g. 'Solar pump · last 30d · trust')");
+    if (!name) return;
+    const v: SavedView = {
+      id: crypto.randomUUID(),
+      name: name.trim().slice(0, 60),
+      kind: kindFilter,
+      project: projectFilter,
+      days,
+      sort,
+    };
+    persistViews([v, ...views].slice(0, 12));
+  }
+  function applyView(v: SavedView) {
+    setKindFilter(v.kind);
+    setProjectFilter(v.project);
+    setDays(v.days);
+    setSort(v.sort);
+  }
+  function deleteView(id: string) {
+    persistViews(views.filter((v) => v.id !== id));
+  }
 
   const aggregate = trust.reduce(
     (acc, t) => ({
@@ -140,11 +228,30 @@ function Impact() {
               >
                 <Upload className="size-3.5" /> Upload evidence
               </Link>
-              <button
-                onClick={() => exportEvidenceCsv(visible)}
+              <Link
+                to="/impact/smoke-test"
                 className="inline-flex items-center gap-1.5 rounded-full border border-ink/10 bg-card px-3.5 py-1.5 text-xs font-medium hover:bg-sand-deep"
               >
-                <Download className="size-3.5" /> Ledger CSV
+                Smoke test
+              </Link>
+              <button
+                onClick={() => exportEvidenceCsv(visible, (r) => trustImpact(r.kind))}
+                className="inline-flex items-center gap-1.5 rounded-full border border-ink/10 bg-card px-3.5 py-1.5 text-xs font-medium hover:bg-sand-deep"
+              >
+                <Download className="size-3.5" /> Filtered CSV
+              </button>
+              <button
+                onClick={() =>
+                  exportEvidencePdf({
+                    rows: visible,
+                    filterSummary: filterSummary(),
+                    trustImpact: (r) => trustImpact(r.kind),
+                    projectTitle: projectTitleById,
+                  })
+                }
+                className="inline-flex items-center gap-1.5 rounded-full border border-ink/10 bg-card px-3.5 py-1.5 text-xs font-medium hover:bg-sand-deep"
+              >
+                <Download className="size-3.5" /> Filtered PDF
               </button>
               <button
                 onClick={() => exportTransactionsCsv(txs)}
@@ -155,7 +262,7 @@ function Impact() {
             </div>
           </div>
 
-          <div className="mb-6 flex flex-wrap items-center gap-3 rounded-xl bg-card px-4 py-3 ring-1 ring-ink/5">
+          <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl bg-card px-4 py-3 ring-1 ring-ink/5">
             <Picker label="Project" value={projectFilter} onChange={setProjectFilter}>
               <option value="ALL">All projects</option>
               {projects.map((p) => (
@@ -176,10 +283,41 @@ function Impact() {
               <option value="trust">Trust-score impact</option>
               <option value="kind">Evidence type</option>
             </Picker>
+            <button
+              onClick={saveCurrentView}
+              className="inline-flex items-center gap-1.5 rounded-full border border-ink/10 bg-sand px-3 py-1.5 font-mono text-[11px] text-ink/70 hover:bg-sand-deep"
+            >
+              <BookmarkPlus className="size-3.5" /> Save view
+            </button>
             <span className="ml-auto inline-flex items-center gap-1 font-mono text-[11px] text-ink/45">
               <ArrowDownUp className="size-3" /> {visible.length} of {evidence.length} entries
             </span>
           </div>
+
+          {views.length > 0 && (
+            <div className="mb-6 flex flex-wrap items-center gap-2 rounded-xl bg-sand-deep/50 px-4 py-3">
+              <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-ink/55">
+                <Bookmark className="size-3" /> Saved views
+              </span>
+              {views.map((v) => (
+                <span
+                  key={v.id}
+                  className="inline-flex items-center gap-1 rounded-full bg-card px-2.5 py-1 font-mono text-[11px] ring-1 ring-ink/5"
+                >
+                  <button onClick={() => applyView(v)} className="text-ink/75 hover:text-moss">
+                    {v.name}
+                  </button>
+                  <button
+                    onClick={() => deleteView(v.id)}
+                    aria-label={`Delete view ${v.name}`}
+                    className="text-ink/35 hover:text-earth"
+                  >
+                    <Trash2 className="size-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
 
           <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
             <div className="rounded-2xl bg-card ring-1 ring-ink/5">
@@ -187,19 +325,41 @@ function Impact() {
                 <p className="font-mono text-xs uppercase tracking-widest text-ink/50">Evidence Stream · Live</p>
                 <span className="flex items-center gap-2 font-mono text-[11px] text-moss">
                   <span className="size-1.5 rounded-full bg-moss" />
-                  {visible.length} entries
+                  Page {page} of {totalPages}
                 </span>
               </div>
               <ul className="divide-y divide-ink/5">
-                {visible.length === 0 && (
+                {pageItems.length === 0 && (
                   <li className="px-6 py-12 text-center text-sm text-ink/50">
                     No evidence matches these filters yet.
                   </li>
                 )}
-                {visible.map((e) => (
+                {pageItems.map((e) => (
                   <EvidenceItem key={e.id} e={e} project={projects.find((p) => p.id === e.project_id)} />
                 ))}
               </ul>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between border-t border-ink/5 px-6 py-3">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="rounded-full border border-ink/10 bg-sand px-3 py-1.5 font-mono text-[11px] text-ink/70 disabled:opacity-40 hover:bg-sand-deep"
+                  >
+                    ← Prev
+                  </button>
+                  <span className="font-mono text-[11px] text-ink/55">
+                    Showing {(page - 1) * PAGE_SIZE + 1}–
+                    {Math.min(page * PAGE_SIZE, visible.length)} of {visible.length}
+                  </span>
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                    className="rounded-full border border-ink/10 bg-sand px-3 py-1.5 font-mono text-[11px] text-ink/70 disabled:opacity-40 hover:bg-sand-deep"
+                  >
+                    Next →
+                  </button>
+                </div>
+              )}
             </div>
 
             <aside className="space-y-6">
