@@ -19,6 +19,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReceiptsIdRouteImport } from './routes/receipts.$id'
 import { Route as ProjectsIdRouteImport } from './routes/projects.$id'
+import { Route as ImpactSmokeTestRouteImport } from './routes/impact.smoke-test'
 import { Route as CommunitiesIdRouteImport } from './routes/communities.$id'
 import { Route as ImpactEvidenceIdRouteImport } from './routes/impact.evidence.$id'
 import { Route as AuthenticatedImpactUploadRouteImport } from './routes/_authenticated/impact.upload'
@@ -72,6 +73,11 @@ const ProjectsIdRoute = ProjectsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => ProjectsRoute,
 } as any)
+const ImpactSmokeTestRoute = ImpactSmokeTestRouteImport.update({
+  id: '/smoke-test',
+  path: '/smoke-test',
+  getParentRoute: () => ImpactRoute,
+} as any)
 const CommunitiesIdRoute = CommunitiesIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -98,6 +104,7 @@ export interface FileRoutesByFullPath {
   '/impact': typeof ImpactRouteWithChildren
   '/projects': typeof ProjectsRouteWithChildren
   '/communities/$id': typeof CommunitiesIdRoute
+  '/impact/smoke-test': typeof ImpactSmokeTestRoute
   '/projects/$id': typeof ProjectsIdRoute
   '/receipts/$id': typeof ReceiptsIdRoute
   '/impact/upload': typeof AuthenticatedImpactUploadRoute
@@ -112,6 +119,7 @@ export interface FileRoutesByTo {
   '/impact': typeof ImpactRouteWithChildren
   '/projects': typeof ProjectsRouteWithChildren
   '/communities/$id': typeof CommunitiesIdRoute
+  '/impact/smoke-test': typeof ImpactSmokeTestRoute
   '/projects/$id': typeof ProjectsIdRoute
   '/receipts/$id': typeof ReceiptsIdRoute
   '/impact/upload': typeof AuthenticatedImpactUploadRoute
@@ -128,6 +136,7 @@ export interface FileRoutesById {
   '/impact': typeof ImpactRouteWithChildren
   '/projects': typeof ProjectsRouteWithChildren
   '/communities/$id': typeof CommunitiesIdRoute
+  '/impact/smoke-test': typeof ImpactSmokeTestRoute
   '/projects/$id': typeof ProjectsIdRoute
   '/receipts/$id': typeof ReceiptsIdRoute
   '/_authenticated/impact/upload': typeof AuthenticatedImpactUploadRoute
@@ -144,6 +153,7 @@ export interface FileRouteTypes {
     | '/impact'
     | '/projects'
     | '/communities/$id'
+    | '/impact/smoke-test'
     | '/projects/$id'
     | '/receipts/$id'
     | '/impact/upload'
@@ -158,6 +168,7 @@ export interface FileRouteTypes {
     | '/impact'
     | '/projects'
     | '/communities/$id'
+    | '/impact/smoke-test'
     | '/projects/$id'
     | '/receipts/$id'
     | '/impact/upload'
@@ -173,6 +184,7 @@ export interface FileRouteTypes {
     | '/impact'
     | '/projects'
     | '/communities/$id'
+    | '/impact/smoke-test'
     | '/projects/$id'
     | '/receipts/$id'
     | '/_authenticated/impact/upload'
@@ -263,6 +275,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsIdRouteImport
       parentRoute: typeof ProjectsRoute
     }
+    '/impact/smoke-test': {
+      id: '/impact/smoke-test'
+      path: '/smoke-test'
+      fullPath: '/impact/smoke-test'
+      preLoaderRoute: typeof ImpactSmokeTestRouteImport
+      parentRoute: typeof ImpactRoute
+    }
     '/communities/$id': {
       id: '/communities/$id'
       path: '/$id'
@@ -311,10 +330,12 @@ const CommunitiesRouteWithChildren = CommunitiesRoute._addFileChildren(
 )
 
 interface ImpactRouteChildren {
+  ImpactSmokeTestRoute: typeof ImpactSmokeTestRoute
   ImpactEvidenceIdRoute: typeof ImpactEvidenceIdRoute
 }
 
 const ImpactRouteChildren: ImpactRouteChildren = {
+  ImpactSmokeTestRoute: ImpactSmokeTestRoute,
   ImpactEvidenceIdRoute: ImpactEvidenceIdRoute,
 }
 
@@ -347,3 +368,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
