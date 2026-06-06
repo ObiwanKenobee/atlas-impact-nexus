@@ -238,10 +238,22 @@ function AtlasAI() {
                       </blockquote>
                     )}
                     {m.citations && m.citations.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        {m.citations.map((c, idx) => (
-                          <CitationChip key={idx} c={c} n={idx + 1} />
-                        ))}
+                      <div className="space-y-1.5 pt-1">
+                        <div className="flex flex-wrap gap-1.5">
+                          {m.citations.map((c, idx) => (
+                            <CitationChip key={idx} c={c} n={idx + 1} />
+                          ))}
+                        </div>
+                        {m.unresolved ? (
+                          <p className="font-mono text-[10px] text-earth">
+                            ⚠ {m.unresolved} citation{m.unresolved > 1 ? "s" : ""} could not be
+                            resolved in the live ledger.
+                          </p>
+                        ) : (
+                          <p className="font-mono text-[10px] text-ink/40">
+                            ✓ All {m.citations.length} citations verified against the live ledger.
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>
@@ -289,11 +301,20 @@ function AtlasAI() {
 function CitationChip({ c, n }: { c: Citation; n: number }) {
   const base =
     "inline-flex items-center gap-1.5 rounded-full bg-moss-soft px-2.5 py-1 font-mono text-[10px] text-moss hover:bg-moss hover:text-sand transition-colors";
+  const broken =
+    "inline-flex items-center gap-1.5 rounded-full bg-earth-soft px-2.5 py-1 font-mono text-[10px] text-earth ring-1 ring-earth/30 cursor-not-allowed line-through";
   const label = (
     <>
       <span className="font-semibold">[{n}]</span> {c.label}
     </>
   );
+  if (!c.resolved) {
+    return (
+      <span className={broken} title="Citation could not be resolved in the live ledger">
+        {label}
+      </span>
+    );
+  }
   if (c.kind === "project")
     return (
       <Link to="/projects/$id" params={{ id: c.slug }} className={base}>
