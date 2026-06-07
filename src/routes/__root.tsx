@@ -13,6 +13,9 @@ import { Toaster } from "sonner";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AuthProvider } from "@/hooks/use-auth";
+import { DevErrorPanel } from "@/components/DevErrorPanel";
+import { ViteReloadOverlay } from "@/components/ViteReloadOverlay";
+import { logError } from "@/lib/error-log";
 
 function NotFoundComponent() {
   return (
@@ -41,6 +44,12 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
+    logError({
+      message: error.message,
+      stack: error.stack,
+      userId: null,
+      source: "react_boundary",
+    });
   }, [error]);
 
   return (
@@ -131,6 +140,8 @@ function RootComponent() {
       <AuthProvider>
         <Outlet />
         <Toaster position="top-right" richColors closeButton />
+        <ViteReloadOverlay />
+        <DevErrorPanel />
       </AuthProvider>
     </QueryClientProvider>
   );
