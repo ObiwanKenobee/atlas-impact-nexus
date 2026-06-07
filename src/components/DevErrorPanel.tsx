@@ -14,7 +14,10 @@ export function DevErrorPanel() {
 
   useEffect(() => {
     installClientErrorListeners();
-    return subscribeErrorLog(setEntries);
+    const unsub = subscribeErrorLog(setEntries);
+    return () => {
+      unsub();
+    };
   }, []);
 
   if (!import.meta.env.DEV) return null;
