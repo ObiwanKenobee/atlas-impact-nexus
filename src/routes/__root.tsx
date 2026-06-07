@@ -13,6 +13,9 @@ import { Toaster } from "sonner";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AuthProvider } from "@/hooks/use-auth";
+import { DevErrorPanel } from "@/components/DevErrorPanel";
+import { ViteReloadOverlay } from "@/components/ViteReloadOverlay";
+import { logError } from "@/lib/error-log";
 
 function NotFoundComponent() {
   return (
