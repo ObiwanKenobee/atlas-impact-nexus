@@ -140,6 +140,8 @@ function RootComponent() {
       <AuthProvider>
         <Outlet />
         <Toaster position="top-right" richColors closeButton />
+        <ViteReloadOverlay />
+        <DevErrorPanel />
       </AuthProvider>
     </QueryClientProvider>
   );
